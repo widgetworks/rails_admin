@@ -42,7 +42,7 @@ module RailsAdmin
           end
 
           def associated_collection(type)
-            return [] if type.blank?
+            return [] if type.blank? || (type =~ /default/) != nil  #NFH - when new type is YAML with :default: value causing error
             config = RailsAdmin.config(type)
             config.abstract_model.all.collect do |object|
               [object.send(config.object_label_method), object.id]
