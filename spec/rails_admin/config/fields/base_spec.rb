@@ -16,6 +16,22 @@ describe RailsAdmin::Config::Fields::Base do
         expect(RailsAdmin.config('Image').fields.detect { |f| f.name == :file }.with(object: Image.new)).to be_required
       end
     end
+
+    context 'when the validation is conditional' do
+      before do
+        class ConditionalValidationTest < Tableless
+          column :foo, :varchar
+          column :bar, :varchar
+          validates :foo, presence: true, if: :presisted?
+          validates :bar, presence: true, unless: :presisted?
+        end
+      end
+
+      it 'is false' do
+        expect(RailsAdmin.config('ConditionalValidationTest').fields.detect { |f| f.name == :foo }).not_to be_required
+        expect(RailsAdmin.config('ConditionalValidationTest').fields.detect { |f| f.name == :bar }).not_to be_required
+      end
+    end
   end
 
   describe '#name' do
@@ -73,6 +89,14 @@ describe RailsAdmin::Config::Fields::Base do
       it 'is the parent field itself' do
         expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :carrierwave_asset }.children_fields).to eq([:carrierwave_asset])
         expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :carrierwave_asset }.hidden?).to be_falsey
+      end
+    end
+
+    if defined?(Refile)
+      context 'of a Refile installation' do
+        it 'is a _id field' do
+          expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :refile_asset }.children_fields).to eq([:refile_asset_id, :refile_asset_filename, :refile_asset_size, :refile_asset_content_type])
+        end
       end
     end
   end
@@ -241,6 +265,12 @@ describe RailsAdmin::Config::Fields::Base do
       it 'of carrierwave should find the underlying column on the base table' do
         expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :carrierwave_asset }.searchable_columns.collect { |c| c[:column] }).to eq(['field_tests.carrierwave_asset'])
       end
+
+      if defined?(Refile)
+        it 'of refile should find the underlying column on the base table' do
+          expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :refile_asset }.searchable_columns.collect { |c| c[:column] }).to eq(['field_tests.refile_asset_id'])
+        end
+      end
     end
   end
 
@@ -271,6 +301,13 @@ describe RailsAdmin::Config::Fields::Base do
       it 'of carrierwave should target the first children field' do
         expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :carrierwave_asset }.searchable).to eq(:carrierwave_asset)
         expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :carrierwave_asset }.sortable).to eq(:carrierwave_asset)
+      end
+
+      if defined?(Refile)
+        it 'of refile should target the first children field' do
+          expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :refile_asset }.searchable).to eq(:refile_asset_id)
+          expect(RailsAdmin.config(FieldTest).fields.detect { |f| f.name == :refile_asset }.sortable).to eq(:refile_asset_id)
+        end
       end
     end
   end
