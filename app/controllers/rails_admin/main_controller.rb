@@ -6,9 +6,9 @@ module RailsAdmin
 
     layout :get_layout
 
-    before_filter :get_model, except: RailsAdmin::Config::Actions.all(:root).collect(&:action_name)
-    before_filter :get_object, only: RailsAdmin::Config::Actions.all(:member).collect(&:action_name)
-    before_filter :check_for_cancel
+    before_action :get_model, except: RailsAdmin::Config::Actions.all(:root).collect(&:action_name)
+    before_action :get_object, only: RailsAdmin::Config::Actions.all(:member).collect(&:action_name)
+    before_action :check_for_cancel
 
     RailsAdmin::Config::Actions.all.each do |action|
       class_eval <<-EOS, __FILE__, __LINE__ + 1
@@ -75,7 +75,7 @@ module RailsAdmin
     end
 
     def redirect_to_on_success
-      notice = t('admin.flash.successful', name: @model_config.label, action: t("admin.actions.#{@action.key}.done"))
+      notice = I18n.t('admin.flash.successful', name: @model_config.label, action: I18n.t("admin.actions.#{@action.key}.done"))
       if params[:_add_another]
         redirect_to new_path(return_to: params[:return_to]), flash: {success: notice}
       elsif params[:_add_edit]
@@ -105,7 +105,7 @@ module RailsAdmin
     end
 
     def handle_save_error(whereto = :new)
-      flash.now[:error] = t('admin.flash.error', name: @model_config.label, action: t("admin.actions.#{@action.key}.done").html_safe).html_safe
+      flash.now[:error] = I18n.t('admin.flash.error', name: @model_config.label, action: I18n.t("admin.actions.#{@action.key}.done").html_safe).html_safe
       flash.now[:error] += %(<br>- #{@object.errors.full_messages.join('<br>- ')}).html_safe
 
       respond_to do |format|
@@ -116,7 +116,7 @@ module RailsAdmin
 
     def check_for_cancel
       return unless params[:_continue] || (params[:bulk_action] && !params[:bulk_ids])
-      redirect_to(back_or_index, notice: t('admin.flash.noaction'))
+      redirect_to(back_or_index, notice: I18n.t('admin.flash.noaction'))
     end
 
     def get_collection(model_config, scope, pagination)

@@ -2,22 +2,35 @@
 require 'spec_helper'
 
 describe RailsAdmin::MainController, type: :controller do
+  routes { RailsAdmin::Engine.routes }
+
+  def get(action, params)
+    if Rails.version >= '5.0'
+      super action, params: params
+    else
+      super action, params
+    end
+  end
+
   describe '#dashboard' do
     before do
       allow(controller).to receive(:render).and_return(true) # no rendering
     end
 
     it 'shows statistics by default' do
-      expect(RailsAdmin.config(Player).abstract_model).to receive(:count).and_return(0)
+      allow(RailsAdmin.config(Player).abstract_model).to receive(:count).and_return(0)
+      expect(RailsAdmin.config(Player).abstract_model).to receive(:count)
       controller.dashboard
     end
 
     it 'does not show statistics if turned off' do
       RailsAdmin.config do |c|
+        c.included_models = [Player]
         c.actions do
           dashboard do
             statistics false
           end
+          index # mandatory
         end
       end
 
@@ -35,22 +48,28 @@ describe RailsAdmin::MainController, type: :controller do
     end
 
     it 'most recent change dates are different for same-named models in different modules' do
-      user_update = 10.days.ago.to_date
-      comment_update = 20.days.ago.to_date
-      FactoryGirl.create(:user_confirmed, updated_at: user_update)
-      FactoryGirl.create(:comment_confirmed, updated_at: comment_update)
+      user_create = 10.days.ago.to_date
+      comment_create = 20.days.ago.to_date
+      FactoryGirl.create(:user_confirmed, created_at: user_create)
+      FactoryGirl.create(:comment_confirmed, created_at: comment_create)
 
       controller.dashboard
-      expect(controller.instance_variable_get('@most_recent_changes')['User::Confirmed']).to eq user_update
-      expect(controller.instance_variable_get('@most_recent_changes')['Comment::Confirmed']).to eq comment_update
+      expect(controller.instance_variable_get('@most_recent_created')['User::Confirmed']).to eq user_create
+      expect(controller.instance_variable_get('@most_recent_created')['Comment::Confirmed']).to eq comment_create
     end
   end
 
   describe '#check_for_cancel' do
-    it 'redirects to back if params[:bulk_ids] is nil when params[:bulk_action] is present' do
+    before do
       allow(controller).to receive(:back_or_index) { fail(StandardError.new('redirected back')) }
+    end
+
+    it 'redirects to back if params[:bulk_ids] is nil when params[:bulk_action] is present' do
       expect { get :bulk_delete, model_name: 'player', bulk_action: 'bulk_delete' }.to raise_error('redirected back')
-      expect { get :bulk_delete, model_name: 'player', bulk_action: 'bulk_delete', bulk_ids: [] }.not_to raise_error
+    end
+
+    it 'does not redirect to back if params[:bulk_ids] and params[:bulk_action] is present' do
+      expect { get :bulk_delete, model_name: 'player', bulk_action: 'bulk_delete', bulk_ids: [1] }.not_to raise_error
     end
   end
 
@@ -300,20 +319,18 @@ describe RailsAdmin::MainController, type: :controller do
       end
 
       it 'sanitize params recursively in nested forms' do
-        expect(controller.params).to eq(
-          'field_test' => {
-            'datetime_field' => ::Time.zone.parse('Sun, 01 Aug 2010 00:00:00 UTC +00:00'),
-            'nested_field_tests_attributes' => {
-              'new_1330520162002' => {
-                'comment_attributes' => {
-                  'created_at' => ::Time.zone.parse('Mon, 02 Aug 2010 00:00:00 UTC +00:00'),
-                },
-                'created_at' => ::Time.zone.parse('Tue, 03 Aug 2010 00:00:00 UTC +00:00'),
+        expect(controller.params[:field_test].to_h).to eq(
+          'datetime_field' => ::Time.zone.parse('Sun, 01 Aug 2010 00:00:00 UTC +00:00'),
+          'nested_field_tests_attributes' => {
+            'new_1330520162002' => {
+              'comment_attributes' => {
+                'created_at' => ::Time.zone.parse('Mon, 02 Aug 2010 00:00:00 UTC +00:00'),
               },
+              'created_at' => ::Time.zone.parse('Tue, 03 Aug 2010 00:00:00 UTC +00:00'),
             },
-            'comment_attributes' => {
-              'created_at' => ::Time.zone.parse('Wed, 04 Aug 2010 00:00:00 UTC +00:00'),
-            },
+          },
+          'comment_attributes' => {
+            'created_at' => ::Time.zone.parse('Wed, 04 Aug 2010 00:00:00 UTC +00:00'),
           },
         )
       end
@@ -349,17 +366,16 @@ describe RailsAdmin::MainController, type: :controller do
       )
 
       controller.send(:sanitize_params_for!, :create, RailsAdmin.config(FieldTest), controller.params['field_test'])
-      expect(controller.params).to eq(
-        'field_test' => {
-          'carrierwave_asset' => 'test',
-          'remove_carrierwave_asset' => 'test',
-          'carrierwave_asset_cache' => 'test',
-          'dragonfly_asset' => 'test',
-          'remove_dragonfly_asset' => 'test',
-          'retained_dragonfly_asset' => 'test',
-          'paperclip_asset' => 'test',
-          'delete_paperclip_asset' => 'test',
-        }.merge(defined?(Refile) ? {'refile_asset' => 'test', 'remove_refile_asset' => 'test'} : {}))
+      expect(controller.params[:field_test].to_h).to eq({
+        'carrierwave_asset' => 'test',
+        'remove_carrierwave_asset' => 'test',
+        'carrierwave_asset_cache' => 'test',
+        'dragonfly_asset' => 'test',
+        'remove_dragonfly_asset' => 'test',
+        'retained_dragonfly_asset' => 'test',
+        'paperclip_asset' => 'test',
+        'delete_paperclip_asset' => 'test',
+      }.merge(defined?(Refile) ? {'refile_asset' => 'test', 'remove_refile_asset' => 'test'} : {}))
     end
 
     it 'allows for polymorphic associations parameters' do
@@ -374,11 +390,10 @@ describe RailsAdmin::MainController, type: :controller do
         },
       )
       controller.send(:sanitize_params_for!, :create, RailsAdmin.config(Comment), controller.params['comment'])
-      expect(controller.params).to eq(
-        'comment' => {
-          'commentable_id' => 'test',
-          'commentable_type' => 'test',
-        })
+      expect(controller.params[:comment].to_h).to eq(
+        'commentable_id' => 'test',
+        'commentable_type' => 'test',
+      )
     end
   end
 end
