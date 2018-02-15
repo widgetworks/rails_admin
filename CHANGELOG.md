@@ -2,10 +2,50 @@
 
 ## [Unreleased](https://github.com/sferik/rails_admin/tree/HEAD)
 
-[Full Changelog](https://github.com/sferik/rails_admin/compare/v1.0.0...HEAD)
+[Full Changelog](https://github.com/sferik/rails_admin/compare/v1.2.0...HEAD)
+
+
+## [1.2.0](https://github.com/sferik/rails_admin/tree/v1.2.0) - 2017-05-31
+
+[Full Changelog](https://github.com/sferik/rails_admin/compare/v1.1.1...v1.2.0)
+
+#### Added
+- Add ILIKE support for PostgreSQL/PostGIS adapter, multibyte downcase for other adapters([#2766](https://github.com/sferik/rails_admin/pull/2766))
+- Support for UUID query([#2766](https://github.com/sferik/rails_admin/pull/2766))
+- Support for Haml 5([#2840](https://github.com/sferik/rails_admin/pull/2840), [#2870](https://github.com/sferik/rails_admin/pull/2870), [#2877](https://github.com/sferik/rails_admin/pull/2877))
+- Add instance option to append a CSS class for rows([#2860](https://github.com/sferik/rails_admin/pull/2860))
+
+### Fixed
+- Remove usage of alias_method_chain, deprecated in Rails 5.0([#2864](https://github.com/sferik/rails_admin/pull/2864))
+- Load models from eager_load, not autoload_paths([#2771](https://github.com/sferik/rails_admin/pull/2771))
+- jQuery 3.0 doesn't have size(), use length instead([#2841](https://github.com/sferik/rails_admin/pull/2841))
+- Prepopulation of the new form didn't work with namespaced models([#2701](https://github.com/sferik/rails_admin/pull/2701))
+
+
+## [1.1.1](https://github.com/sferik/rails_admin/tree/v1.1.1) - 2016-12-25
+
+[Full Changelog](https://github.com/sferik/rails_admin/compare/v1.1.0...v1.1.1)
+
+### Fixed
+- CSV export broke with empty tables([#2796](https://github.com/sferik/rails_admin/issues/2796), [#2797](https://github.com/sferik/rails_admin/pull/2797))
+- ActiveRecord adapter's #encoding did not work with Oracle enhanced adapter([#2789](https://github.com/sferik/rails_admin/pull/2789))
+- ActiveRecord 5 belongs_to presence validators were unintentionally disabled due to initialization mishandling([#2785](https://github.com/sferik/rails_admin/issues/2785), [#2786](https://github.com/sferik/rails_admin/issues/2786))
+- Destroy failure caused subsequent index action to return 404, instead of 200([#2775](https://github.com/sferik/rails_admin/issues/2775), [#2776](https://github.com/sferik/rails_admin/pull/2776))
+- CSVConverter#to_csv now accepts string-keyed hashes([#2740](https://github.com/sferik/rails_admin/issues/2740), [#2741](https://github.com/sferik/rails_admin/pull/2741))
+
+### Security
+- Fix CSRF vulnerability([b13e879e](https://github.com/sferik/rails_admin/commit/b13e879eb93b661204e9fb5e55f7afa4f397537a))
+
+
+## [1.1.0](https://github.com/sferik/rails_admin/tree/v1.1.0) - 2016-10-30
+
+[Full Changelog](https://github.com/sferik/rails_admin/compare/v1.0.0...v1.1.0)
 
 ### Added
 - DSL for association eager-loading([#1325](https://github.com/sferik/rails_admin/issues/1325), [#1342](https://github.com/sferik/rails_admin/issues/1342))
+
+### Fixed
+- Fix nested has_many form failing to add items([#2737](https://github.com/sferik/rails_admin/pull/2737))
 
 
 ## [1.0.0](https://github.com/sferik/rails_admin/tree/v1.0.0) - 2016-09-19
