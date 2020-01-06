@@ -1,9 +1,25 @@
 require 'spec_helper'
 
-describe RailsAdmin::AbstractModel do
+RSpec.describe RailsAdmin::AbstractModel do
+  describe '.all' do
+    it 'returns abstract models for all models' do
+      expect(RailsAdmin::AbstractModel.all.map(&:model)).to include Player, Team
+    end
+
+    it 'does not pick up a model without table', active_record: true do
+      expect(RailsAdmin::AbstractModel.all.map(&:model)).not_to include WithoutTable
+    end
+  end
+
   describe '#to_s' do
     it 'returns model\'s name' do
       expect(RailsAdmin::AbstractModel.new(Cms::BasicPage).to_s).to eq Cms::BasicPage.to_s
+    end
+  end
+
+  describe '#to_param' do
+    it 'turns namespaces into prefixes with ~' do
+      expect(RailsAdmin::AbstractModel.new('Cms::BasicPage').to_param).to eq('cms~basic_page')
     end
   end
 
@@ -56,7 +72,7 @@ describe RailsAdmin::AbstractModel do
           let(:expected_elements_count) { 1 }
         end
       end
-    end if ::Rails.version >= '4.1'
+    end
 
     context 'on dates with :en locale' do
       before do
@@ -77,15 +93,15 @@ describe RailsAdmin::AbstractModel do
     context 'on datetimes with :en locale' do
       before do
         I18n.locale = :en
-        FactoryBot.create(:field_test, datetime_field: Time.local(2012, 1, 1, 23, 59, 59))
-        FactoryBot.create(:field_test, datetime_field: Time.local(2012, 1, 2, 0, 0, 0))
-        FactoryBot.create(:field_test, datetime_field: Time.local(2012, 1, 3, 23, 59, 59))
+        FactoryBot.create(:field_test, datetime_field: Time.zone.local(2012, 1, 1, 23, 59, 59))
+        FactoryBot.create(:field_test, datetime_field: Time.zone.local(2012, 1, 2, 0, 0, 0))
+        FactoryBot.create(:field_test, datetime_field: Time.zone.local(2012, 1, 3, 23, 59, 59))
 
         # TODO: Mongoid 3.0.0 mysteriously expands the range of inclusion slightly...
         if defined?(Mongoid) && Mongoid::VERSION >= '3.0.0'
-          FactoryBot.create(:field_test, datetime_field: Time.local(2012, 1, 4, 0, 0, 1))
+          FactoryBot.create(:field_test, datetime_field: Time.zone.local(2012, 1, 4, 0, 0, 1))
         else
-          FactoryBot.create(:field_test, datetime_field: Time.local(2012, 1, 4, 0, 0, 0))
+          FactoryBot.create(:field_test, datetime_field: Time.zone.local(2012, 1, 4, 0, 0, 0))
         end
       end
 

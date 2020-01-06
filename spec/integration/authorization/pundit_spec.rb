@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe 'RailsAdmin Pundit Authorization', type: :request do
+RSpec.describe 'RailsAdmin Pundit Authorization', type: :request do
   subject { page }
 
   before do
@@ -26,7 +26,7 @@ describe 'RailsAdmin Pundit Authorization', type: :request do
 
   describe 'with read player role' do
     before do
-      @user.update_attributes(roles: [:admin, :read_player])
+      @user.update(roles: [:admin, :read_player])
     end
 
     it 'GET /admin should show Player but not League' do
@@ -48,7 +48,7 @@ describe 'RailsAdmin Pundit Authorization', type: :request do
 
   describe 'with admin role' do
     before do
-      @user.update_attributes(roles: [:admin, :manage_player])
+      @user.update(roles: [:admin, :manage_player])
     end
 
     it 'GET /admin should show Player but not League' do
@@ -78,7 +78,7 @@ describe 'RailsAdmin Pundit Authorization', type: :request do
 
   describe 'with all roles' do
     it 'shows links to all actions' do
-      @user.update_attributes(roles: [:admin, :manage_player])
+      @user.update(roles: [:admin, :manage_player])
       @player = FactoryBot.create :player
 
       visit index_path(model_name: 'player')
@@ -94,6 +94,32 @@ describe 'RailsAdmin Pundit Authorization', type: :request do
       is_expected.to have_content('Delete')
       is_expected.to have_content('History')
       is_expected.to have_content('Show in app')
+    end
+  end
+
+  describe 'with create and read player role' do
+    before do
+      @user.update(roles: [:admin, :read_player, :create_player])
+    end
+
+    it 'POST /admin/player/new with unauthorized attribute value should raise access denied' do
+      visit new_path(model_name: 'player')
+      fill_in 'player[name]', with: 'Jackie Robinson'
+      uncheck 'player[suspended]'
+      expect { click_button 'Save' }.to raise_error(Pundit::NotAuthorizedError)
+    end
+  end
+
+  describe 'with update and read player role' do
+    before do
+      @user.update(roles: [:admin, :read_player, :update_player])
+    end
+
+    it 'PUT /admin/player/new with unauthorized attribute value should raise access denied' do
+      @player = FactoryBot.create :player
+      visit edit_path(model_name: 'player', id: @player.id)
+      check 'player[retired]'
+      expect { click_button 'Save' }.to raise_error(Pundit::NotAuthorizedError)
     end
   end
 
@@ -129,7 +155,7 @@ describe 'RailsAdmin Pundit Authorization', type: :request do
 
   context 'when custom authorization key is suffixed with ?' do
     before do
-      @user.update_attributes(roles: [:admin])
+      @user.update(roles: [:admin])
       RailsAdmin.config do |c|
         c.actions do
           dashboard do

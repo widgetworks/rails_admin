@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe RailsAdmin::ApplicationHelper, type: :helper do
+RSpec.describe RailsAdmin::ApplicationHelper, type: :helper do
   describe '#authorized?' do
     let(:abstract_model) { RailsAdmin.config(FieldTest).abstract_model }
 
@@ -200,6 +200,29 @@ describe RailsAdmin::ApplicationHelper, type: :helper do
         @action = RailsAdmin::Config::Actions.find :dashboard
         expect(helper.menu_for(:root)).not_to match(/Dashboard/)
       end
+
+      it 'shows actions which are marked as show_in_menu' do
+        I18n.backend.store_translations(
+          :en, admin: {actions: {
+            shown_in_menu: {menu: 'Look this'},
+          }}
+        )
+        RailsAdmin.config do |config|
+          config.actions do
+            dashboard do
+              show_in_menu false
+            end
+            root :shown_in_menu, :dashboard do
+              action_name :dashboard
+              show_in_menu true
+            end
+          end
+        end
+
+        @action = RailsAdmin::Config::Actions.find :dashboard
+        expect(helper.menu_for(:root)).not_to match(/Dashboard/)
+        expect(helper.menu_for(:root)).to match(/Look this/)
+      end
     end
 
     describe '#main_navigation' do
@@ -286,6 +309,61 @@ describe RailsAdmin::ApplicationHelper, type: :helper do
       end
     end
 
+    describe '#root_navigation' do
+      it 'shows actions which are marked as show_in_sidebar' do
+        I18n.backend.store_translations(
+          :en, admin: {actions: {
+            shown_in_sidebar: {menu: 'Look this'},
+          }}
+        )
+        RailsAdmin.config do |config|
+          config.actions do
+            dashboard do
+              show_in_sidebar false
+            end
+            root :shown_in_sidebar, :dashboard do
+              action_name :dashboard
+              show_in_sidebar true
+            end
+          end
+        end
+
+        expect(helper.root_navigation).not_to match(/Dashboard/)
+        expect(helper.root_navigation).to match(/Look this/)
+      end
+
+      it 'allows grouping by sidebar_label' do
+        I18n.backend.store_translations(
+          :en, admin: {
+            actions: {
+              foo: {menu: 'Foo'},
+              bar: {menu: 'Bar'},
+            },
+          }
+        )
+        RailsAdmin.config do |config|
+          config.actions do
+            dashboard do
+              show_in_sidebar true
+              sidebar_label 'One'
+            end
+            root :foo, :dashboard do
+              action_name :dashboard
+              show_in_sidebar true
+              sidebar_label 'Two'
+            end
+            root :bar, :dashboard do
+              action_name :dashboard
+              show_in_sidebar true
+              sidebar_label 'Two'
+            end
+          end
+        end
+
+        expect(helper.strip_tags(helper.root_navigation).delete(' ')).to eq 'OneDashboardTwoFooBar'
+      end
+    end
+
     describe '#static_navigation' do
       it 'shows not show static nav if no static links defined' do
         RailsAdmin.config do |config|
@@ -340,12 +418,27 @@ describe RailsAdmin::ApplicationHelper, type: :helper do
             end
           end
         end
-        @action = RailsAdmin::Config::Actions.find :index
-        result = helper.bulk_menu(RailsAdmin::AbstractModel.new(Team))
-        expect(result).to match('zorg_action')
-        expect(result).to match('blub')
+        # Preload all models to prevent I18n being cleared in Mongoid builds
+        RailsAdmin::AbstractModel.all
+        en = {admin: {actions: {
+          zorg: {bulk_link: 'Zorg all these %{model_label_plural}'},
+          blub: {bulk_link: 'Blub all these %{model_label_plural}'},
+        }}}
+        I18n.backend.store_translations(:en, en)
 
-        expect(helper.bulk_menu(RailsAdmin::AbstractModel.new(Player))).not_to match('blub')
+        @abstract_model = RailsAdmin::AbstractModel.new(Team)
+        result = helper.bulk_menu
+
+        expect(result).to match('zorg_action')
+        expect(result).to match('Zorg all these Teams')
+        expect(result).to match('blub')
+        expect(result).to match('Blub all these Teams')
+
+        result_2 = helper.bulk_menu(RailsAdmin::AbstractModel.new(Player))
+        expect(result_2).to match('zorg_action')
+        expect(result_2).to match('Zorg all these Players')
+        expect(result_2).not_to match('blub')
+        expect(result_2).not_to match('Blub all these Players')
       end
     end
 

@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'timecop'
 
-describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
+RSpec.describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
   let(:like) do
     if ['postgresql', 'postgis'].include? ::ActiveRecord::Base.configurations[Rails.env]['adapter']
       '(field ILIKE ?)'
@@ -11,11 +11,7 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
   end
 
   def predicates_for(scope)
-    if scope.respond_to?(:where_values)
-      scope.where_values
-    else
-      scope.where_clause.instance_variable_get(:@predicates)
-    end
+    scope.where_clause.instance_variable_get(:@predicates)
   end
 
   describe '#associations' do
@@ -29,6 +25,12 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
     it 'returns Property class' do
       expect(RailsAdmin::AbstractModel.new(Player).properties.first).
         to be_a_kind_of RailsAdmin::Adapters::ActiveRecord::Property
+    end
+  end
+
+  describe '#base_class' do
+    it 'returns inheritance base class' do
+      expect(RailsAdmin::AbstractModel.new(Hardball).base_class).to eq Ball
     end
   end
 
@@ -132,7 +134,7 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
     end
   end
 
-  describe '#query_conditions' do
+  describe '#query_scope' do
     let(:abstract_model) { RailsAdmin::AbstractModel.new('Team') }
 
     before do
@@ -157,9 +159,27 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
         expect { abstract_model.all(query: 'foo') }.not_to raise_error
       end
     end
+
+    context 'when parsing is not idempotent' do
+      before do
+        RailsAdmin.config do |c|
+          c.model Team do
+            field :name do
+              def parse_value(value)
+                "#{value}s"
+              end
+            end
+          end
+        end
+      end
+
+      it 'parses value only once' do
+        expect(abstract_model.all(query: 'foo')).to match_array @teams[1]
+      end
+    end
   end
 
-  describe '#filter_conditions' do
+  describe '#filter_scope' do
     let(:abstract_model) { RailsAdmin::AbstractModel.new('Team') }
 
     before do
@@ -184,6 +204,43 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
 
     it 'makes correct query' do
       expect(abstract_model.all(filters: {'name' => {'0000' => {o: 'like', v: 'foo'}}, 'division' => {'0001' => {o: 'like', v: 'bar'}}}, include: :division)).to eq([@teams[2]])
+    end
+
+    context 'when parsing is not idempotent' do
+      before do
+        RailsAdmin.config do |c|
+          c.model Team do
+            field :name do
+              def parse_value(value)
+                "some#{value}"
+              end
+            end
+          end
+        end
+      end
+
+      it 'parses value only once' do
+        expect(abstract_model.all(filters: {'name' => {'0000' => {o: 'like', v: 'where'}}})).to match_array @teams[2]
+      end
+    end
+
+    context 'when a default_search_operator is set' do
+      before do
+        RailsAdmin.config do |c|
+          c.default_search_operator = 'starts_with'
+        end
+      end
+
+      it 'only matches on prefix' do
+        # Specified operator is honored and matches
+        expect(abstract_model.all(filters: {'name' => {'0000' => {o: 'like', v: 'where'}}})).to match_array @teams[2..3]
+
+        # No operator falls back to the default_search_operator(starts_with) and doesn't match NON-PREFIX
+        expect(abstract_model.all(filters: {'name' => {'0000' => {v: 'where'}}})).to be_empty
+
+        # No operator falls back to the default_search_operator(starts_with) and doesn't match NON-PREFIX
+        expect(abstract_model.all(filters: {'name' => {'0000' => {v: 'somewhere'}}})).to match_array @teams[2]
+      end
     end
   end
 
@@ -216,6 +273,13 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
           expect(build_statement(:string, 'foo', 'default')).to eq([like, '%foo%'])
           expect(build_statement(:string, 'FOO', 'default')).to eq([like, '%foo%'])
         end
+      end
+
+      it 'chooses like statement in per-model basis' do
+        allow(FieldTest.connection).to receive(:adapter_name).and_return('postgresql')
+        expect(build_statement(:string, 'foo', 'default')).to eq(['(field ILIKE ?)', '%foo%'])
+        allow(FieldTest.connection).to receive(:adapter_name).and_return('sqlite3')
+        expect(build_statement(:string, 'foo', 'default')).to eq(['(LOWER(field) LIKE ?)', '%foo%'])
       end
 
       it "supports '_blank' operator" do
@@ -443,10 +507,10 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
       end
 
       it 'supports datetime type query' do
-        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['', 'February 01, 2012 12:00', 'March 01, 2012 12:00'], o: 'between'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field BETWEEN ? AND ?)', Time.local(2012, 2, 1), Time.local(2012, 3, 1).end_of_day])))
-        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['', 'March 01, 2012 12:00', ''], o: 'between'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field >= ?)', Time.local(2012, 3, 1)])))
-        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['', '', 'February 01, 2012 12:00'], o: 'between'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field <= ?)', Time.local(2012, 2, 1).end_of_day])))
-        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['February 01, 2012 12:00'], o: 'default'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field BETWEEN ? AND ?)', Time.local(2012, 2, 1), Time.local(2012, 2, 1).end_of_day])))
+        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['', 'February 01, 2012 12:00', 'March 01, 2012 12:00'], o: 'between'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field BETWEEN ? AND ?)', Time.utc(2012, 2, 1), Time.utc(2012, 3, 1).end_of_day])))
+        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['', 'March 01, 2012 12:00', ''], o: 'between'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field >= ?)', Time.utc(2012, 3, 1)])))
+        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['', '', 'February 01, 2012 12:00'], o: 'between'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field <= ?)', Time.utc(2012, 2, 1).end_of_day])))
+        expect(predicates_for(abstract_model.send(:filter_scope, scope, 'datetime_field' => {'1' => {v: ['February 01, 2012 12:00'], o: 'default'}}))).to eq(predicates_for(scope.where(['(field_tests.datetime_field BETWEEN ? AND ?)', Time.utc(2012, 2, 1), Time.utc(2012, 2, 1).end_of_day])))
       end
     end
 
@@ -464,7 +528,7 @@ describe 'RailsAdmin::Adapters::ActiveRecord', active_record: true do
       it 'supports string enum type query' do
         expect(predicates_for(abstract_model.send(:filter_scope, scope, 'string_enum_field' => {'1' => {v: 'm', o: 'default'}}))).to eq(predicates_for(scope.where(['(field_tests.string_enum_field IN (?))', 'm'])))
       end
-    end if ::Rails.version >= '4.1'
+    end
 
     it 'supports uuid type query' do
       uuid = SecureRandom.uuid
